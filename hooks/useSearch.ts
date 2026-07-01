@@ -210,6 +210,7 @@ export function useSearch() {
     if (isInitializingFromUrl.current) {
       return;
     }
+    const controller = new AbortController();
     let active = true;
     async function loadProducts() {
       try {
@@ -227,7 +228,9 @@ export function useSearch() {
           params.append("maxPrice", String(debouncedMaxPrice));
         }
 
-        const response = await fetch(`/api/products?${params.toString()}`);
+        const response = await fetch(`/api/products?${params.toString()}`, {
+          signal: controller.signal
+        });
         if (!response.ok) {
           throw new Error("Failed to load products");
         }
@@ -240,6 +243,9 @@ export function useSearch() {
           setPriceCap(data.priceCap || 0);
         }
       } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
         console.error("Error loading products:", error);
       } finally {
         if (active) {
@@ -251,11 +257,13 @@ export function useSearch() {
     loadProducts();
     return () => {
       active = false;
+      controller.abort();
     };
   }, [currentPage, debouncedQuery, debouncedCategories, debouncedBrands, debouncedMaxPrice, debouncedInStockOnly, debouncedSort]);
 
   // Fetch suggestions from API as user types
   useEffect(() => {
+    const controller = new AbortController();
     let active = true;
     async function loadSuggestions() {
       try {
@@ -264,7 +272,9 @@ export function useSearch() {
           q: debouncedSuggestionsQuery,
           recent: recentSearches.join(",")
         });
-        const response = await fetch(`/api/products?${params.toString()}`);
+        const response = await fetch(`/api/products?${params.toString()}`, {
+          signal: controller.signal
+        });
         if (!response.ok) {
           throw new Error("Failed to load suggestions");
         }
@@ -274,6 +284,9 @@ export function useSearch() {
           setRecentSuggestionItems(data.recent || []);
         }
       } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
         console.error("Error loading suggestions:", error);
       }
     }
@@ -282,6 +295,7 @@ export function useSearch() {
 
     return () => {
       active = false;
+      controller.abort();
     };
   }, [debouncedSuggestionsQuery, recentSearches]);
 
